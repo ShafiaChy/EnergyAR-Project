@@ -1,6 +1,7 @@
 import cv2
 
-folderName = "fan on"
+fileName = "r1"
+folderName = "freeze on"
 outputPath = "output\\" + folderName + "\\"
   
 def FrameCapture(path):
@@ -14,4 +15,4 @@ def FrameCapture(path):
         count += 1
   
 if __name__ == '__main__':
-    FrameCapture("%s.mp4" % folderName)
+    FrameCapture("%s.mp4" % fileName)

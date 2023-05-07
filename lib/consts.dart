@@ -12,12 +12,10 @@ String apiKey = "siIw3JmatQvW--Nc09vh_iLjYmvZMsXj";
 
 var myHome = IoTHome(
   lightState: false,
-  bulbState: false,
+  freezeState: false,
   fanState: false,
-  lightVolt: 0,
-  bulbVolt: 0,
-  fanVolt: 0,
+  acVolt: 0,
   lightAmp: 0,
-  bulbAmp: 0,
+  freezeAmp: 0,
   fanAmp: 0,
 );

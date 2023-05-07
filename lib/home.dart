@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'package:augmented_home_control/iot_model.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
-import 'package:http/http.dart' as http;
+import 'package:tcp_socket_connection/tcp_socket_connection.dart';
 import 'consts.dart';
 
 class Home extends StatefulWidget {
@@ -23,17 +22,21 @@ class _HomeState extends State<Home> {
   bool _isCameraReady = false;
   bool _isBusy = false;
   double zoomLevel = 1.0;
+  bool isConnected = false;
+
+  // local network
+  TcpSocketConnection client = TcpSocketConnection("192.168.4.1", 5000);
 
   @override
   void initState() {
     initCamera();
-    Timer.periodic(const Duration(seconds: 10), (timer) async {
-      Map<String, dynamic> params = {'token': apiKey};
-      params.addAll(myHome.toMapGet());
-      var url = Uri.https(host, getPath, params);
-      var response = await http.get(url);
-      myHome = IoTHome.fromJson(response.body);
-    });
+    // Timer.periodic(const Duration(seconds: 10), (timer) async {
+    //   Map<String, dynamic> params = {'token': apiKey};
+    //   params.addAll(myHome.toMapGet());
+    //   var url = Uri.https(host, getPath, params);
+    //   var response = await http.get(url);
+    //   myHome = IoTHome.fromJson(response.body);
+    // });
     super.initState();
   }
 
@@ -45,7 +48,39 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
+  void onReceive(String msg) {
+    if (msg.contains("D=")) {
+      msg = msg.replaceFirst("D=", "");
+      var data = msg.split(",");
+      myHome.acVolt = int.parse(data[0]);
+      myHome.freezeAmp = double.parse(data[1]);
+      myHome.fanAmp = double.parse(data[2]);
+      myHome.lightAmp = double.parse(data[3]);
+      print(myHome.toString());
+    }
+  }
+
+  Future<void> connectESP() async {
+    if (client.isConnected()) {
+      client.disconnect();
+      isConnected = false;
+      snackBar("Disconnected.", Colors.blueAccent, Colors.white);
+      return;
+    }
+    snackBar("Connecting...", Colors.blueAccent, Colors.white);
+    await client.connect(3000, onReceive);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (client.isConnected()) {
+        isConnected = true;
+        snackBar("Connected to ESP.", Colors.blueAccent, Colors.white);
+      } else {
+        snackBar("Failed to connect!", Colors.redAccent, Colors.white);
+      }
+    });
+  }
+
   snackBar(String msg, Color bg, Color fg) {
+    ScaffoldMessenger.of(context).clearSnackBars();
     return ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg, textAlign: TextAlign.center, style: TextStyle(color: fg)), backgroundColor: bg),
     );
@@ -111,7 +146,9 @@ class _HomeState extends State<Home> {
     detectedObject = "No Object";
     for (int i = 0; i < objects.length; i++) {
       var object = objects[i];
-      detectedObject = objectName[object.index];
+      if (objectName[object.index] != "none") {
+        detectedObject = objectName[object.index];
+      }
     }
     _isBusy = false;
     if (mounted) setState(() {});
@@ -119,18 +156,15 @@ class _HomeState extends State<Home> {
 
   Widget showUsages() {
     if (detectedObject.contains('off')) return const SizedBox.shrink();
-    int volt = 0;
+    int volt = myHome.acVolt;
     double amp = 0, load = 0;
-    if (detectedObject.contains('tube')) {
-      volt = myHome.bulbVolt;
-      amp = myHome.bulbAmp;
-      load = myHome.bulbWatt();
+    if (detectedObject.contains('freeze')) {
+      amp = myHome.freezeAmp;
+      load = myHome.freezeWatt();
     } else if (detectedObject.contains('light')) {
-      volt = myHome.lightVolt;
       amp = myHome.lightAmp;
       load = myHome.lightWatt();
     } else if (detectedObject.contains('fan')) {
-      volt = myHome.fanVolt;
       amp = myHome.fanAmp;
       load = myHome.fanWatt();
     }
@@ -141,6 +175,7 @@ class _HomeState extends State<Home> {
         width: 150,
         height: 120,
         child: Card(
+          color: const Color.fromARGB(132, 255, 255, 255),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -148,8 +183,8 @@ class _HomeState extends State<Home> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 Text("Voltage: $volt VAC"),
-                Text("Current: ${amp}A"),
-                Text("Load: $load Watt"),
+                Text("Current: ${amp.toStringAsFixed(2)}A"),
+                Text("Load: ${load.toInt()} Watt"),
               ],
             ),
           ),
@@ -159,20 +194,24 @@ class _HomeState extends State<Home> {
   }
 
   Widget showActions() {
-    String title = "";
+    String title = "", cmd = "";
     bool state = false;
+
     Map<String, dynamic> params = {'token': apiKey};
-    if (detectedObject.contains('tube')) {
-      title = "Tubelight";
-      state = myHome.bulbState;
-      params.addEntries(myHome.toMapBulb(!state).entries);
+    if (detectedObject.contains('freeze')) {
+      title = "Freeze";
+      state = myHome.freezeState;
+      cmd = "R=${state ? 0 : 1}";
+      params.addEntries(myHome.toMapFreeze(!state).entries);
     } else if (detectedObject.contains('light')) {
       title = "Light";
       state = myHome.lightState;
+      cmd = "L=${state ? 0 : 1}";
       params.addEntries(myHome.toMapLight(!state).entries);
     } else if (detectedObject.contains('fan')) {
       title = "Fan";
       state = myHome.fanState;
+      cmd = "F=${state ? 0 : 1}";
       params.addEntries(myHome.toMapFan(!state).entries);
     }
     return Positioned(
@@ -182,6 +221,7 @@ class _HomeState extends State<Home> {
         width: 270,
         height: 70,
         child: Card(
+          color: const Color.fromARGB(132, 255, 255, 255),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
@@ -189,11 +229,24 @@ class _HomeState extends State<Home> {
               children: [
                 Text("$title is ${state ? "ON" : "OFF"}"),
                 OutlinedButton(
-                  child: Text(state ? "TURN OFF" : "TURN ON"),
+                  child: Text(
+                    state ? "TURN OFF" : "TURN ON",
+                    style: const TextStyle(color: Colors.black),
+                  ),
                   onPressed: () async {
-                    var url = Uri.https(host, updatePath, params);
+                    //var url = Uri.https(host, updatePath, params);
                     //print(url.toString());
-                    await http.get(url);
+                    //await http.get(url);
+                    if (client.isConnected()) {
+                      client.sendMessage(cmd);
+                      if (title == 'Freeze') {
+                        myHome.freezeState = !myHome.freezeState;
+                      } else if (title == 'Light') {
+                        myHome.lightState = !myHome.lightState;
+                      } else if (title == 'Fan') {
+                        myHome.fanState = !myHome.fanState;
+                      }
+                    }
                     setState(() {});
                   },
                 ),
@@ -245,6 +298,19 @@ class _HomeState extends State<Home> {
                                   setState(() {});
                                 },
                               ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 10,
+                            top: 50,
+                            child: FilledButton(
+                              style: ButtonStyle(
+                                backgroundColor: isConnected
+                                    ? MaterialStateProperty.all(Colors.redAccent)
+                                    : MaterialStateProperty.all(Colors.greenAccent),
+                              ),
+                              onPressed: connectESP,
+                              child: Icon(isConnected ? Icons.link_off : Icons.link),
                             ),
                           ),
                         ],

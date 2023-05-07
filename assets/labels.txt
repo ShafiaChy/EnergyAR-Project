@@ -1,6 +1,7 @@
-light on
-light off
-tubelight on
-tubelight off
-fan on
 fan off
+fan on
+light off
+light on
+freeze off
+freeze on
+none

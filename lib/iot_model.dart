@@ -2,47 +2,39 @@ import 'dart:convert';
 
 class IoTHome {
   bool lightState;
-  bool bulbState;
+  bool freezeState;
   bool fanState;
-  int lightVolt;
-  int bulbVolt;
-  int fanVolt;
+  int acVolt;
   double lightAmp;
-  double bulbAmp;
+  double freezeAmp;
   double fanAmp;
 
   IoTHome({
     required this.lightState,
-    required this.bulbState,
+    required this.freezeState,
     required this.fanState,
-    required this.lightVolt,
-    required this.bulbVolt,
-    required this.fanVolt,
+    required this.acVolt,
     required this.lightAmp,
-    required this.bulbAmp,
+    required this.freezeAmp,
     required this.fanAmp,
   });
 
   IoTHome copyWith({
     bool? lightState,
-    bool? bulbState,
+    bool? freezeState,
     bool? fanState,
-    int? lightVolt,
-    int? bulbVolt,
-    int? fanVolt,
+    int? acVolt,
     double? lightAmp,
-    double? bulbAmp,
+    double? freezeAmp,
     double? fanAmp,
   }) {
     return IoTHome(
       lightState: lightState ?? this.lightState,
-      bulbState: bulbState ?? this.bulbState,
+      freezeState: freezeState ?? this.freezeState,
       fanState: fanState ?? this.fanState,
-      lightVolt: lightVolt ?? this.lightVolt,
-      bulbVolt: bulbVolt ?? this.bulbVolt,
-      fanVolt: fanVolt ?? this.fanVolt,
+      acVolt: acVolt ?? this.acVolt,
       lightAmp: lightAmp ?? this.lightAmp,
-      bulbAmp: bulbAmp ?? this.bulbAmp,
+      freezeAmp: freezeAmp ?? this.freezeAmp,
       fanAmp: fanAmp ?? this.fanAmp,
     );
   }
@@ -56,8 +48,6 @@ class IoTHome {
       'v4': '',
       'v5': '',
       'v6': '',
-      'v7': '',
-      'v8': '',
     };
   }
 
@@ -67,7 +57,7 @@ class IoTHome {
     };
   }
 
-  Map<String, dynamic> toMapBulb(bool state) {
+  Map<String, dynamic> toMapFreeze(bool state) {
     return <String, dynamic>{
       'v1': state ? '1' : '0',
     };
@@ -82,28 +72,24 @@ class IoTHome {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'v0': lightState,
-      'v1': bulbState,
+      'v1': freezeState,
       'v2': fanState,
-      'v3': lightVolt,
-      'v4': bulbVolt,
-      'v5': fanVolt,
-      'v6': lightAmp,
-      'v7': bulbAmp,
-      'v8': fanAmp,
+      'v3': acVolt,
+      'v4': lightAmp,
+      'v5': freezeAmp,
+      'v6': fanAmp,
     };
   }
 
   factory IoTHome.fromMap(Map<String, dynamic> map) {
     return IoTHome(
       lightState: map['v0'] as int == 1 ? true : false,
-      bulbState: map['v1'] as int == 1 ? true : false,
+      freezeState: map['v1'] as int == 1 ? true : false,
       fanState: map['v2'] as int == 1 ? true : false,
-      lightVolt: map['v3'] as int,
-      bulbVolt: map['v4'] as int,
-      fanVolt: map['v5'] as int,
-      lightAmp: map['v6'] as double,
-      bulbAmp: map['v7'] as double,
-      fanAmp: map['v8'] as double,
+      acVolt: map['v3'] as int,
+      lightAmp: map['v4'] as double,
+      freezeAmp: map['v5'] as double,
+      fanAmp: map['v6'] as double,
     );
   }
 
@@ -111,13 +97,13 @@ class IoTHome {
 
   factory IoTHome.fromJson(String source) => IoTHome.fromMap(json.decode(source) as Map<String, dynamic>);
 
-  double lightWatt() => lightVolt * lightAmp * 0.9;
-  double bulbWatt() => bulbVolt * bulbAmp * 0.9;
-  double fanWatt() => fanVolt * fanAmp * 0.9;
+  double lightWatt() => acVolt * lightAmp * 0.9;
+  double freezeWatt() => acVolt * freezeAmp * 0.9;
+  double fanWatt() => acVolt * fanAmp * 0.9;
 
   @override
   String toString() {
-    return 'Home(v0: $lightState, v1: $bulbState, v2: $fanState, v3: $lightVolt, v4: $bulbVolt, v5: $fanVolt, v6: $lightAmp, v7: $bulbAmp, v8: $fanAmp)';
+    return 'Home(v0: $lightState, v1: $freezeState, v2: $fanState, v3: $acVolt, v4: $lightAmp, v5: $freezeAmp, v6: $fanAmp)';
   }
 
   @override
@@ -125,26 +111,22 @@ class IoTHome {
     if (identical(this, other)) return true;
 
     return other.lightState == lightState &&
-        other.bulbState == bulbState &&
+        other.freezeState == freezeState &&
         other.fanState == fanState &&
-        other.lightVolt == lightVolt &&
-        other.bulbVolt == bulbVolt &&
-        other.fanVolt == fanVolt &&
+        other.acVolt == acVolt &&
         other.lightAmp == lightAmp &&
-        other.bulbAmp == bulbAmp &&
+        other.freezeAmp == freezeAmp &&
         other.fanAmp == fanAmp;
   }
 
   @override
   int get hashCode {
     return lightState.hashCode ^
-        bulbState.hashCode ^
+        freezeState.hashCode ^
         fanState.hashCode ^
-        lightVolt.hashCode ^
-        bulbVolt.hashCode ^
-        fanVolt.hashCode ^
+        acVolt.hashCode ^
         lightAmp.hashCode ^
-        bulbAmp.hashCode ^
+        freezeAmp.hashCode ^
         fanAmp.hashCode;
   }
 }
