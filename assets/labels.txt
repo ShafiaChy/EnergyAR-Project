@@ -1,7 +1,7 @@
-fan off
-fan on
-light off
-light on
-freeze off
-freeze on
-none
+0 fan off
+1 fan on
+2 light off
+3 light on
+4 freeze off
+5 freeze on
+6 none
