@@ -16,27 +16,25 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void initState() {
-    Timer.periodic(const Duration(minutes: 1), (timer) async {
+    Timer.periodic(const Duration(seconds: 30), (timer) async {
       try {
         // get light data
-        var url = Uri.https("${host}light.json");
+        var url = Uri.parse("${host}light.json");
         var response = await http.get(url);
         lightData = jsonDecode(response.body);
         print(lightData);
-
         // get light data
-        url = Uri.https("${host}fan.json");
+        url = Uri.parse("${host}fan.json");
         response = await http.get(url);
         fanData = jsonDecode(response.body);
         print(fanData);
-
         // get light data
-        url = Uri.https("${host}freeze.json");
+        url = Uri.parse("${host}freeze.json");
         response = await http.get(url);
         freezeData = jsonDecode(response.body);
         print(freezeData);
       } catch (ex) {
-        print("no internet!");
+        print(ex);
       }
     });
     super.initState();
