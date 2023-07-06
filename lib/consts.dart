@@ -5,10 +5,7 @@ List<CameraDescription> cameras = [];
 const int backCam = 0;
 const int frontCam = 1;
 
-String host = "sgp1.blynk.cloud";
-String getPath = "/external/api/get";
-String updatePath = "/external/api/update";
-String apiKey = "siIw3JmatQvW--Nc09vh_iLjYmvZMsXj";
+String host = "https://energyar-50ed5-default-rtdb.firebaseio.com/";
 
 var myHome = IoTHome(
   lightState: false,

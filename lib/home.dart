@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:augmented_home_control/dashboard.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:tcp_socket_connection/tcp_socket_connection.dart';
+import 'package:http/http.dart' as http;
 import 'consts.dart';
 
 class Home extends StatefulWidget {
@@ -23,6 +25,7 @@ class _HomeState extends State<Home> {
   bool _isBusy = false;
   double zoomLevel = 1.0;
   bool isConnected = false;
+  bool webMode = false;
 
   // local network
   TcpSocketConnection client = TcpSocketConnection("192.168.4.1", 5000);
@@ -92,8 +95,6 @@ class _HomeState extends State<Home> {
     final optionsLocal = LocalLabelerOptions(modelPath: modelPath, confidenceThreshold: 0.75);
     var file = await rootBundle.loadString('assets/labels.txt');
     objectName = file.split('\n');
-    // ------------ Default model
-    final optionsDefault = ImageLabelerOptions(confidenceThreshold: 0.75);
     _objectDetector = ImageLabeler(options: optionsLocal);
 
     _controller = CameraController(camera, ResolutionPreset.high);
@@ -167,6 +168,8 @@ class _HomeState extends State<Home> {
     } else if (detectedObject.contains('fan')) {
       amp = myHome.fanAmp;
       load = myHome.fanWatt();
+    } else {
+      return const SizedBox.shrink();
     }
     return Positioned(
       top: 50,
@@ -193,26 +196,34 @@ class _HomeState extends State<Home> {
     );
   }
 
+  void toggleSwitches(String title) {
+    if (title == 'Freeze') {
+      myHome.freezeState = !myHome.freezeState;
+    } else if (title == 'Light') {
+      myHome.lightState = !myHome.lightState;
+    } else if (title == 'Fan') {
+      myHome.fanState = !myHome.fanState;
+    }
+  }
+
   Widget showActions() {
     String title = "", cmd = "";
     bool state = false;
 
-    Map<String, dynamic> params = {'token': apiKey};
     if (detectedObject.contains('freeze')) {
       title = "Freeze";
       state = myHome.freezeState;
       cmd = "R=${state ? 0 : 1}";
-      params.addEntries(myHome.toMapFreeze(!state).entries);
     } else if (detectedObject.contains('light')) {
       title = "Light";
       state = myHome.lightState;
       cmd = "L=${state ? 0 : 1}";
-      params.addEntries(myHome.toMapLight(!state).entries);
     } else if (detectedObject.contains('fan')) {
       title = "Fan";
       state = myHome.fanState;
       cmd = "F=${state ? 0 : 1}";
-      params.addEntries(myHome.toMapFan(!state).entries);
+    } else {
+      return const SizedBox.shrink();
     }
     return Positioned(
       bottom: 30,
@@ -234,17 +245,18 @@ class _HomeState extends State<Home> {
                     style: const TextStyle(color: Colors.black),
                   ),
                   onPressed: () async {
-                    //var url = Uri.https(host, updatePath, params);
-                    //print(url.toString());
-                    //await http.get(url);
-                    if (client.isConnected()) {
-                      client.sendMessage(cmd);
-                      if (title == 'Freeze') {
-                        myHome.freezeState = !myHome.freezeState;
-                      } else if (title == 'Light') {
-                        myHome.lightState = !myHome.lightState;
-                      } else if (title == 'Fan') {
-                        myHome.fanState = !myHome.fanState;
+                    if (webMode) {
+                      toggleSwitches(title);
+                      try {
+                        var url = Uri.parse("${host}state.json");
+                        await http.patch(url, body: myHome.toJson());
+                      } catch (ex) {
+                        toggleSwitches(title);
+                      }
+                    } else {
+                      if (client.isConnected()) {
+                        client.sendMessage(cmd);
+                        toggleSwitches(title);
                       }
                     }
                     setState(() {});
@@ -282,6 +294,40 @@ class _HomeState extends State<Home> {
                         children: [
                           detectedObject == "No Object" ? const SizedBox.shrink() : showUsages(),
                           detectedObject == "No Object" ? const SizedBox.shrink() : showActions(),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                detectedObject,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 10,
+                            top: 100,
+                            child: ChoiceChip(
+                              label: const Text("Web"),
+                              selected: webMode,
+                              selectedColor: Colors.green,
+                              onSelected: (value) => setState(() {
+                                webMode = value;
+                              }),
+                            ),
+                          ),
+                          Positioned(
+                            right: 10,
+                            top: 145,
+                            child: ChoiceChip(
+                              label: const Text("Local"),
+                              selected: !webMode,
+                              selectedColor: Colors.green,
+                              onSelected: (value) => setState(() {
+                                webMode = !value;
+                              }),
+                            ),
+                          ),
                           Positioned(
                             right: 0,
                             bottom: 20,
@@ -300,19 +346,20 @@ class _HomeState extends State<Home> {
                               ),
                             ),
                           ),
-                          Positioned(
-                            right: 10,
-                            top: 50,
-                            child: FilledButton(
-                              style: ButtonStyle(
-                                backgroundColor: isConnected
-                                    ? MaterialStateProperty.all(Colors.redAccent)
-                                    : MaterialStateProperty.all(Colors.greenAccent),
+                          if (!webMode)
+                            Positioned(
+                              right: 10,
+                              top: 50,
+                              child: FilledButton(
+                                style: ButtonStyle(
+                                  backgroundColor: isConnected
+                                      ? MaterialStateProperty.all(Colors.green)
+                                      : MaterialStateProperty.all(Colors.red),
+                                ),
+                                onPressed: connectESP,
+                                child: Icon(isConnected ? Icons.link_off : Icons.link),
                               ),
-                              onPressed: connectESP,
-                              child: Icon(isConnected ? Icons.link_off : Icons.link),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -329,15 +376,22 @@ class _HomeState extends State<Home> {
                         ),
                       ),
                       const Text("Move camera around to see actions."),
-                      Card(
-                        elevation: 0,
-                        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(50))),
-                        color: Colors.purple[50],
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                          child: Text(detectedObject),
-                        ),
+                      const SizedBox(height: 10),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => const Dashboard()));
+                        },
+                        child: const Text("Dashboard"),
                       ),
+                      // Card(
+                      //   elevation: 0,
+                      //   shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(50))),
+                      //   color: Colors.purple[50],
+                      //   child: Padding(
+                      //     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                      //     child: Text(detectedObject),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),
